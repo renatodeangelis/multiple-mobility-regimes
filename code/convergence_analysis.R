@@ -34,6 +34,22 @@ make_panel = function(data, parent = "max", child, "all", measure = "1-beta"){
   wide
   }
 
+# Function to run Phillips-Sul tests
+run_ps = function(panel_df, dataCols, time_trime = 0.2, HACmethod = "FQSB", cstar = 0, refCol = NULL) {
+  stopifnot(is.data.frame(panel_df))
+  if(is.null(refCol)) {
+    refCol = max(dataCols)
+    }
+
+  H = computeH(panel_df[, dataCols], quantity = "H")
+  global = estimateMod(H, time_trim = time_trim, HACmethod = HACmethod)
+
+  clubs = findClubs(panel_df, dataCols = dataCols, unit_names = 1, refCol = refCol,
+                    time_trim = time_trim, cstar = cstar, HACmethod = HACmethod)
+
+  list(H = H, global = global, clubs = clubs)
+  }
+
 # Restrict to countries with observations for 1940-1980 cohorts
 keep_1940 = gdim |> group_by(country) |> count() |> filter(n == 60) |> pull(country)
 gdim_1940 = gdim |> filter(country %in% keep_1940)
