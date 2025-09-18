@@ -20,7 +20,19 @@ gdim = read_csv("https://www.dropbox.com/scl/fi/rfhjr8vsozbm3tf9b0hl1/GDIM_2023_
     }
   }
 
+# Function to build balanced panel with relevant indicators
+make_panel = function(data, parent = "max", child, "all", measure = "1-beta"){
+  df = gdim |> filter(.data$parent = "parent", .data$child = "child") |>
+  .add_indicator("measure") |>
+  select(country, cohort, val)
 
+  wide = df |>
+  pivot_wider(names_from = "cohort", values_from = "val") |>
+  arrange(country) |>
+  as.data.frame()
+
+  wide
+  }
 
 # Restrict to countries with observations for 1940-1980 cohorts
 keep_1940 = gdim |> group_by(country) |> count() |> filter(n == 60) |> pull(country)
