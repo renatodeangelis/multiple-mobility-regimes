@@ -6,6 +6,22 @@ library(broom)
 
 gdim = read_csv("https://www.dropbox.com/scl/fi/rfhjr8vsozbm3tf9b0hl1/GDIM_2023_03.csv?rlkey=e7xkxskhd2tqrh13lp13th9xr&st=2wdvfvf0&dl=1")
 
+# Helper to compute indicator column from measure choice
+.add_indicator = function(df, measure){
+  stopifnot(measure %in% c("1-beta", "1-cor", "MU050", "BHQ4"))
+  if (measure == "1-beta") {
+    df |> mutate(val = 1 - .data[["BETA"]])
+    } else if (measure == "1-cor") {
+    df |> mutate(val = 1 - .data[["COR"]])
+    } else if (measure == "MU050") {
+    df |> mutate(val == .data[["MU050_tiebreak"]])
+    } else if (measure == "BHQ4") {
+    df |> mutate(val == .data[["BHQ4_tiebreak"]])
+    }
+  }
+
+
+
 # Restrict to countries with observations for 1940-1980 cohorts
 keep_1940 = gdim |> group_by(country) |> count() |> filter(n == 60) |> pull(country)
 gdim_1940 = gdim |> filter(country %in% keep_1940)
