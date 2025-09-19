@@ -58,7 +58,6 @@ run_ps = function(data,
   
   panel_df = make_panel(data, parent, child, measure)
   
-  stopifnot(is.data.frame(panel_df))
   if(is.null(refCol)) {
     refCol = max(dataCols)
   }
@@ -72,10 +71,19 @@ run_ps = function(data,
   list(H = H, global = global, clubs = clubs)
 }
 
-
-# Restrict to countries with observations for 1940-1980 cohorts
+# Restrict sample to countries with observations for 1940-1980 cohorts
 keep_1940 = gdim |> group_by(country) |> count() |> filter(n == 60) |> pull(country)
 gdim_1940 = gdim |> filter(country %in% keep_1940)
+
+
+
+
+
+
+
+
+
+
 
 
 
