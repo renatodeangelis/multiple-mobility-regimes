@@ -8,21 +8,29 @@ gdim = read_csv("https://www.dropbox.com/scl/fi/rfhjr8vsozbm3tf9b0hl1/GDIM_2023_
 
 # Helper to compute indicator column from measure choice
 .add_indicator = function(df, measure){
-  stopifnot(measure %in% c("1-beta", "1-cor", "MU050", "BHQ4"))
-  if (measure == "1-beta") {
-    df |> mutate(val = 1 - .data[["BETA"]])
-    } else if (measure == "1-cor") {
-    df |> mutate(val = 1 - .data[["COR"]])
-    } else if (measure == "MU050") {
-    df |> mutate(val == .data[["MU050_tiebreak"]])
-    } else if (measure == "BHQ4") {
-    df |> mutate(val == .data[["BHQ4_tiebreak"]])
+  key = tolower(gsub("[^a-z0-9]", "", measure))
+
+  if (key %in% c("1beta","1cor","mu050","bhq4",
+                 "mu050randomtiebreak","bhq4randomtiebreak")) {
+    if (key == "1beta") {
+      df$val = 1 - df$BETA
+    } else if (key == "1cor") {
+      df$val = 1 - df$COR
+    } else if (key %in% c("mu050","mu050randomtiebreak")) {
+      df$val = df$MU050_randomtiebreak
+    } else if (key %in% c("bhq4","bhq4randomtiebreak")) {
+      df$val = df$BHQ4_randomtiebreak
     }
+    return(df[, c("country","cohort","val")])
+  } else {
+    stop("`measure` not recognized. Try one of: '1-beta','1-cor','MU050','BHQ4'.")
   }
+}
+
 
 # Function to build balanced panel with relevant indicators
 make_panel = function(data, parent = "max", child = "all", measure = "1-beta"){
-  df = gdim |> filter(.data$parent = "parent", .data$child = "child") |>
+  df = gdim |> filter(.data$parent == "parent", .data$child == "child") |>
   .add_indicator("measure") |>
   select(country, cohort, val)
 
@@ -35,7 +43,7 @@ make_panel = function(data, parent = "max", child = "all", measure = "1-beta"){
   }
 
 # Function to run Phillips-Sul tests
-run_ps = function(panel_df, dataCols, time_trime = 0.2, HACmethod = "FQSB", cstar = 0, refCol = NULL) {
+run_ps = function(panel_df, dataCols, time_trim = 0.2, HACmethod = "FQSB", cstar = 0, refCol = NULL) {
   stopifnot(is.data.frame(panel_df))
   if(is.null(refCol)) {
     refCol = max(dataCols)
