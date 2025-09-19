@@ -21,7 +21,7 @@ gdim = read_csv("https://www.dropbox.com/scl/fi/rfhjr8vsozbm3tf9b0hl1/GDIM_2023_
   }
 
 # Function to build balanced panel with relevant indicators
-make_panel = function(data, parent = "max", child, "all", measure = "1-beta"){
+make_panel = function(data, parent = "max", child = "all", measure = "1-beta"){
   df = gdim |> filter(.data$parent = "parent", .data$child = "child") |>
   .add_indicator("measure") |>
   select(country, cohort, val)
