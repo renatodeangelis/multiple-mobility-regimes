@@ -1,5 +1,5 @@
 ---
-title: "convergence_09_22"
+title: "Exploratory Convergence Analysis"
 output:
   pdf_document: default
   html_document: default
@@ -13,11 +13,7 @@ library(lmtest)
 library(broom)
 
 gdim = read_csv("https://www.dropbox.com/scl/fi/rfhjr8vsozbm3tf9b0hl1/GDIM_2023_03.csv?rlkey=e7xkxskhd2tqrh13lp13th9xr&st=2wdvfvf0&dl=1")
-```
 
-Helper functions:
-
-```{r}
 # Helper to compute indicator column from measure choice
 .add_indicator = function(df, measure){
  
@@ -82,61 +78,75 @@ run_ps = function(data,
   
   list(H = H, global = global, clubs = clubs)
 }
-```
 
-Actual data:
-
-```{r}
 # Restrict sample to countries with observations for 1940-1980 cohorts
 keep_1940 = gdim |> group_by(country) |> count() |> filter(n == 60) |> pull(country)
 gdim_1940 = gdim |> filter(country %in% keep_1940)
 ```
 
-```{r}
+The following code chunks implement the Phillips-Sul algorithm for identifying convergence clubs in the GDIM. There are four chunks, separated based on the parent-child sample restriction. This first chunk, the 'default', takes the maximum parental education and includes both sons and daughters. Each chunk contains five specifications, each using a different measure (based on Van der Weide et al. 2024):
+
+- 1-beta corresponds to 1 minus the coefficient from regressing children's schooling on parents' schooling. 
+
+- 1-cor corresponds to 1 minus the correlation between children's and parents' schooling.
+
+- MU050 corresponds to the expected educational rank of children born to parents from the bottom half.
+
+- BHQ4 corresponds to the probability that children born to parents in the bottom half reach the top quartile.
+
+- MIX corresponds to the share of children with strictly higher educational attainment than their parents (or with tertiary, conditional on one parent having attained tertiary).
+
+The results appear to be very much contingent on the measure selected, so this requires some thought. For each specification in this first chunk, I report the cross-sectional variances (\$H) for each cohort and the results of the log-t test (\$global), as well as the convergence clubs (\$clubs) with their associated log-t test parameters. For illustrative purposes, I include the plots of the transition paths for these first five runs (though I think they are of limited utility here). 
+
+For the code underlying the functions, see https://github.com/renatodeangelis/multiple-mobility-regimes/blob/main/code/convergence_analysis.R
+
+```{r, fig.height=10}
 ige_max = run_ps(gdim_1940, dataCols = 2:6); ige_max
-plot(ige_max$clubs, avgTP = FALSE)
+plot(ige_max$clubs, avgTP = FALSE, main = "Transition paths for 1-beta")
 
 cor_max = run_ps(gdim_1940, measure = "1-cor", dataCols = 2:6); cor_max
-plot(cor_max$clubs, avgTP = FALSE)
+plot(cor_max$clubs, avgTP = FALSE, main = "Transition paths for 1-cor")
 
 mu050_max = run_ps(gdim_1940, measure = "mu050", dataCols = 2:6); mu050_max
-plot(mu050_max$clubs, avgTP = FALSE)
+plot(mu050_max$clubs, avgTP = FALSE, main = "Transition paths for mu050")
 
 bhq4_max = run_ps(gdim_1940, measure = "bhq4", dataCols = 2:6); bhq4_max
-plot(bhq4_max$clubs, avgTP = FALSE)
+plot(bhq4_max$clubs, avgTP = FALSE, main = "Transition paths for bhq4")
 
 mix_max = run_ps(gdim_1940, measure = "mix", dataCols = 2:6); mix_max
-plot(mix_max$clubs, avgTP = FALSE)
-
+plot(mix_max$clubs, avgTP = FALSE, main = "Transition paths for mix")
 ```
 
+The following results use average parental education, rather than the parental maximum.
 
 ```{r}
-ige_avg = run_ps(gdim_1940, parent = "avg", dataCols = 2:6)
+ige_avg = run_ps(gdim_1940, parent = "avg", dataCols = 2:6); ige_avg
 cor_avg = run_ps(gdim_1940, parent = "avg",
-                 measure = "1-cor", dataCols = 2:6)
+                 measure = "1-cor", dataCols = 2:6); cor_avg
 mu050_avg = run_ps(gdim_1940, parent = "avg",
-                   measure = "mu050", dataCols = 2:6)
+                   measure = "mu050", dataCols = 2:6); mu050_avg
 bhq4_avg = run_ps(gdim_1940, parent = "avg",
-                  measure = "bhq4", dataCols = 2:6)
+                  measure = "bhq4", dataCols = 2:6); bhq4_avg
 mix_avg = run_ps(gdim_1940, parent = "avg",
-                 measure = "mix", dataCols = 2:6)
+                 measure = "mix", dataCols = 2:6); mix_avg
 ```
 
+These results restrict the parent set to fathers, while keeping all children.
 
 ```{r}
 ige_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
-                     dataCols = 2:6)
+                     dataCols = 2:6); ige_dad_all
 cor_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
-                 measure = "1-cor", dataCols = 2:6)
+                 measure = "1-cor", dataCols = 2:6); cor_dad_all
 mu050_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
-                   measure = "mu050", dataCols = 2:6)
+                   measure = "mu050", dataCols = 2:6); mu050_dad_all
 bhq4_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
-                  measure = "bhq4", dataCols = 2:6)
+                  measure = "bhq4", dataCols = 2:6); bhq4_dad_all
 mix_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
-                 measure = "mix", dataCols = 2:6)
+                 measure = "mix", dataCols = 2:6); mix_dad_all
 ```
 
+These results restrict the set solely to father-son mobility.
 
 ```{r}
 ige_dad_son = run_ps(gdim_1940, parent = "dad", child = "son",
