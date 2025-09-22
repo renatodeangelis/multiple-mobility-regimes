@@ -1,0 +1,161 @@
+---
+title: "convergence_09_22"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ConvergenceClubs)
+library(sandwich)
+library(lmtest)
+library(broom)
+
+gdim = read_csv("https://www.dropbox.com/scl/fi/rfhjr8vsozbm3tf9b0hl1/GDIM_2023_03.csv?rlkey=e7xkxskhd2tqrh13lp13th9xr&st=2wdvfvf0&dl=1")
+```
+
+Helper functions:
+
+```{r}
+# Helper to compute indicator column from measure choice
+.add_indicator = function(df, measure){
+ 
+  key = tolower(gsub("[^a-z0-9]", "", measure))
+  
+  if (key == "1beta") {
+    df = df |> mutate(val = 1 - .data[["BETA"]])
+  } else if (key == "1cor") {
+    df = df |> mutate(val = 1 - .data[["COR"]])
+  } else if (key == "mu050") {
+    df = df |> mutate(val = .data[["MU050_randomtiebreak"]])
+  } else if (key == "bhq4") {
+    df = df |> mutate(val = .data[["BHQ4_randomtiebreak"]])
+  } else if (key == "ahmp") {
+    df = df |> mutate(val = .data[["CAT_ISCED0"]])
+  } else if (key == "mix") {
+    df = df |> mutate(val = .data[["MIX"]])
+  } else {
+    stop("`measure` not recognized. Use one of: '1-beta', '1-cor', 'mu050', 'bhq4', 'ahmp', 'mix'.")
+  }
+  
+  df |> select(country, cohort, val)
+}
+
+
+# Function to build balanced panel with relevant indicators
+make_panel = function(data, parent = "max", child = "all", measure = "1-beta"){
+  
+  df = data |> filter(.data$parent == !!parent, .data$child == !!child) |>
+    .add_indicator(measure)
+  
+  wide = df |>
+    pivot_wider(names_from = "cohort", values_from = "val") |>
+    arrange(country) |>
+    as.data.frame()
+  
+  wide
+}
+
+# Function to run Phillips-Sul tests
+run_ps = function(data,
+                  parent = "max",
+                  child = "all",
+                  measure = "1-beta",
+                  dataCols,
+                  time_trim = 0.3,
+                  HACmethod = "FQSB",
+                  cstar = 0,
+                  refCol = NULL) {
+  
+  panel_df = make_panel(data, parent, child, measure)
+  
+  if(is.null(refCol)) {
+    refCol = max(dataCols)
+  }
+  
+  H = computeH(panel_df[, dataCols], quantity = "H")
+  global = estimateMod(H, time_trim = time_trim, HACmethod = HACmethod)
+  
+  clubs = findClubs(panel_df, dataCols = dataCols, unit_names = 1, refCol = refCol,
+                    time_trim = time_trim, cstar = cstar, HACmethod = HACmethod)
+  
+  list(H = H, global = global, clubs = clubs)
+}
+```
+
+Actual data:
+
+```{r}
+# Restrict sample to countries with observations for 1940-1980 cohorts
+keep_1940 = gdim |> group_by(country) |> count() |> filter(n == 60) |> pull(country)
+gdim_1940 = gdim |> filter(country %in% keep_1940)
+```
+
+```{r}
+ige_max = run_ps(gdim_1940, dataCols = 2:6); ige_max
+plot(ige_max$clubs, avgTP = FALSE)
+
+cor_max = run_ps(gdim_1940, measure = "1-cor", dataCols = 2:6); cor_max
+plot(cor_max$clubs, avgTP = FALSE)
+
+mu050_max = run_ps(gdim_1940, measure = "mu050", dataCols = 2:6); mu050_max
+plot(mu050_max$clubs, avgTP = FALSE)
+
+bhq4_max = run_ps(gdim_1940, measure = "bhq4", dataCols = 2:6); bhq4_max
+plot(bhq4_max$clubs, avgTP = FALSE)
+
+mix_max = run_ps(gdim_1940, measure = "mix", dataCols = 2:6); mix_max
+plot(mix_max$clubs, avgTP = FALSE)
+
+```
+
+
+```{r}
+ige_avg = run_ps(gdim_1940, parent = "avg", dataCols = 2:6)
+cor_avg = run_ps(gdim_1940, parent = "avg",
+                 measure = "1-cor", dataCols = 2:6)
+mu050_avg = run_ps(gdim_1940, parent = "avg",
+                   measure = "mu050", dataCols = 2:6)
+bhq4_avg = run_ps(gdim_1940, parent = "avg",
+                  measure = "bhq4", dataCols = 2:6)
+mix_avg = run_ps(gdim_1940, parent = "avg",
+                 measure = "mix", dataCols = 2:6)
+```
+
+
+```{r}
+ige_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
+                     dataCols = 2:6)
+cor_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
+                 measure = "1-cor", dataCols = 2:6)
+mu050_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
+                   measure = "mu050", dataCols = 2:6)
+bhq4_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
+                  measure = "bhq4", dataCols = 2:6)
+mix_dad_all = run_ps(gdim_1940, parent = "dad", child = "all",
+                 measure = "mix", dataCols = 2:6)
+```
+
+
+```{r}
+ige_dad_son = run_ps(gdim_1940, parent = "dad", child = "son",
+                     dataCols = 2:6); ige_dad_son
+cor_dad_son = run_ps(gdim_1940, parent = "dad", child = "son",
+                 measure = "1-cor", dataCols = 2:6); cor_dad_son
+mu050_dad_son = run_ps(gdim_1940, parent = "dad", child = "son",
+                   measure = "mu050", dataCols = 2:6); mu050_dad_son
+bhq4_dad_son = run_ps(gdim_1940, parent = "dad", child = "son",
+                  measure = "bhq4", dataCols = 2:6); bhq4_dad_son
+mix_dad_son = run_ps(gdim_1940, parent = "dad", child = "son",
+                 measure = "mix", dataCols = 2:6); mix_dad_son
+```
+
+
+
+
+
+
+
+
+
