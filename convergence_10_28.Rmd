@@ -1,0 +1,339 @@
+---
+title: "Convergence Based on Hansen Growth Regimes"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(haven)
+library(ConvergenceClubs)
+library(sandwich)
+library(lmtest)
+library(broom)
+
+ineq = read_dta("https://www.dropbox.com/scl/fi/hb2rsfjqlu438c3hcd2ct/country_gdp_inequality_and_more.dta?rlkey=ewxox10esprcfkajrg189ilca&st=7dzzp9l4&dl=1")
+.add_indicator = function(df, measure){
+ 
+  key = tolower(gsub("[^a-z0-9]", "", measure))
+  
+  if (key == "shwealthtop1") {
+    df = df |> mutate(val = .data[["sh_wealth_top1"]])
+  } else if (key == "shincometop1") {
+    df = df |> mutate(val = .data[["sh_income_top1"]])
+  } else if (key == "shwealthtop10") {
+    df = df |> mutate(val = .data[["sh_wealth_top10"]])
+  } else if (key == "shincometop10") {
+    df = df |> mutate(val = .data[["sh_income_top10"]])
+  } else if (key == "pipgini") {
+    df = df |> mutate(val = .data[["pip_gini"]])
+  } else {
+    stop("`measure` not recognized. Use one of: 'sh_wealth_top1', 'sh_income_top1',
+         'sh_wealth_top10', 'sh_income_top10', 'pip_gini'")
+  }
+  
+  df |> select(code, year, val)
+}
+
+
+# Function to build balanced panel with relevant indicators
+make_panel = function(data, measure = "sh_wealth_top1"){
+  
+  df = data |> .add_indicator(measure)
+  
+  wide = df |>
+    pivot_wider(names_from = "year", values_from = "val") |>
+    arrange(code) |>
+    as.data.frame()
+  
+  wide
+}
+
+# Function to run Phillips-Sul tests
+run_ps = function(data,
+                  measure = "sh_wealth_top1",
+                  dataCols,
+                  time_trim = 0.3,
+                  HACmethod = "FQSB",
+                  cstar = 0,
+                  refCol = NULL) {
+  
+  panel_df = make_panel(data, measure)
+  
+  if(is.null(refCol)) {
+    refCol = max(dataCols)
+  }
+  
+  H = computeH(panel_df[, dataCols], quantity = "H")
+  global = estimateMod(H, time_trim = time_trim, HACmethod = HACmethod)
+  
+  clubs = findClubs(panel_df, dataCols = dataCols, unit_names = 1, refCol = refCol,
+                    time_trim = time_trim, cstar = cstar, HACmethod = HACmethod)
+  
+  list(H = H, global = global, clubs = clubs)
+}
+```
+
+The three growth regimes are defined by the following country codes (first split at 1960 GDP per capita of $863, then 1950 literacy rate of 45%, per Hansen [2000]):
+
+```{r}
+# Column 1
+group1 = c(
+  "BFA","BDI","ETH","MWI","MLI","MRT","NER","RWA","SLE","TZA",
+  "TGO","UGA","COD","MMR","CAF","LBR","BGD","NPL")
+ineq1 = ineq |> filter(code %in% group1)
+
+# Column 2
+group2 = c(
+  "DZA","AGO","BEN","CMR", "TCD","COG","EGY","GHA","CIV",
+  "KEN","MAR","MOZ","NGA","SEN","SOM","SDN","TUN","ZMB",
+  "ZWE","IND","JOR","PAK","SYR","TUR","GTM","HTI",
+  "HND","BOL","IDN","PNG")
+ineq2 = ineq |> filter(code %in% group2)
+
+# Column 3
+group3 = c(
+  "MDG","ZAF","HKG","ISR","JPN","KOR","MYS","PHL","SGP","LKA",
+  "THA","GRC","IRL","PRT","ESP","CRI","DOM","SLV","JAM","MEX",
+  "NIC","PAN","BRA","COL","ECU","PRY","PER","AUT","BEL","DNK",
+  "FIN","FRA","DEU","ITA","NLD","NOR","SWE","CHE","GBR","CAN",
+  "TTO","USA","ARG","CHL","URY","VEN","AUS","NZL")
+ineq3 = ineq |> filter(code %in% group3)
+```
+
+# Inequality Results
+
+The following code chunks implement the Phillips-Sul algorithm for identifying convergence clubs to the inequality panel, separated by the growth regimes established in Durlauf and Johnson (1995). There are five measures of inequality:
+
+- Gini coefficient
+
+- Share of wealth held by the top $1\%$
+
+- Share of wealth held by the top $10\%$
+
+- Share of income earned by the top $1\%$
+
+- Share of income earned by the top $10\%$
+
+I report the clubs for each of these measures within the growth regimes. Consistent with the guidance in Phillips and Sul (2007; 2009), I set $c^* = 0$ and $t = 0.3$ because of the small sample size. 
+
+## Wealth (top 1%)
+
+```{r}
+wealth1_1 = run_ps(ineq1 |> filter(year %in% 1995:2020), dataCols = 2:27); wealth1_1$clubs
+
+wealth1_2 = run_ps(ineq2 |> filter(year %in% 1995:2020), dataCols = 2:27); wealth1_2$clubs
+
+wealth1_3 = run_ps(ineq3 |> filter(year %in% 1995:2020), dataCols = 2:27); wealth1_3$clubs
+```
+
+## Wealth (top 10%)
+
+```{r}
+wealth10_1 = run_ps(ineq1 |> filter(year %in% 1995:2020),
+                    measure = "sh_wealth_top10",
+                    dataCols = 2:27); wealth10_1$clubs
+
+wealth10_2 = run_ps(ineq2 |> filter(year %in% 1995:2020),
+                    measure = "sh_wealth_top10",
+                    dataCols = 2:27); wealth10_2$clubs
+
+wealth10_3 = run_ps(ineq3 |> filter(year %in% 1995:2020),
+                    measure = "sh_wealth_top10",
+                    dataCols = 2:27); wealth10_3$clubs
+```
+
+## Income (top 1%)
+
+```{r}
+income1_1 = run_ps(ineq1 |> filter(year %in% 1980:2022),
+                   measure = "sh_income_top1",
+                   dataCols = 2:44); income1_1$clubs
+
+# income1_2 = run_ps(ineq2 |> filter(year %in% 1980:2022),
+#                   measure = "sh_income_top1",
+#                   dataCols = 2:44); income1_2$clubs
+
+income1_3 = run_ps(ineq3 |> filter(year %in% 1980:2022),
+                   measure = "sh_income_top1",
+                   dataCols = 2:44); income1_3$clubs
+```
+
+
+## Income (top 10%)
+
+```{r}
+income10_1 = run_ps(ineq1 |> filter(year %in% 1980:2022),
+                   measure = "sh_income_top10",
+                   dataCols = 2:44); income10_1$clubs
+
+income10_2 = run_ps(ineq2 |> filter(year %in% 1980:2022),
+                   measure = "sh_income_top10",
+                   dataCols = 2:44); income10_2$clubs
+
+# income10_3 = run_ps(ineq3 |> filter(year %in% 1980:2022),
+#                   measure = "sh_income_top10",
+#                   dataCols = 2:44); income10_3$clubs
+```
+
+## Gini
+
+```{r}
+gini_1 = run_ps(ineq1 |> filter(year %in% 2004:2013, !(code %in% c("MMR", "COD"))),
+                                measure = "pip_gini",
+                                dataCols = 2:11); gini_1$clubs
+
+gini_2 = run_ps(ineq2 |> filter(year %in% 2004:2013,
+                                !(code %in% c("COG", "SDN", "SOM", "SYR", "ZWE"))),
+                                measure = "pip_gini",
+                                dataCols = 2:11); gini_2$clubs
+
+gini_3 = run_ps(ineq3 |> filter(year %in% 2004:2013,
+                                !(code %in% c("HKG", "JAM", "JPN", "SGP", "NZL",
+                                              "TTO", "VEN"))),
+                                measure = "pip_gini",
+                                dataCols = 2:11); gini_3$clubs
+```
+
+# Mobility Results
+
+```{r, include=FALSE}
+gdim = read_csv("https://www.dropbox.com/scl/fi/rfhjr8vsozbm3tf9b0hl1/GDIM_2023_03.csv?rlkey=e7xkxskhd2tqrh13lp13th9xr&st=2wdvfvf0&dl=1")
+
+# Helper to compute indicator column from measure choice
+.add_indicator = function(df, measure){
+ 
+  key = tolower(gsub("[^a-z0-9]", "", measure))
+  
+  if (key == "1beta") {
+    df = df |> mutate(val = 1 - .data[["BETA"]])
+  } else if (key == "1cor") {
+    df = df |> mutate(val = 1 - .data[["COR"]])
+  } else if (key == "mu050") {
+    df = df |> mutate(val = .data[["MU050_randomtiebreak"]])
+  } else if (key == "bhq4") {
+    df = df |> mutate(val = .data[["BHQ4_randomtiebreak"]])
+  } else if (key == "ahmp") {
+    df = df |> mutate(val = .data[["CAT_ISCED0"]])
+  } else if (key == "mix") {
+    df = df |> mutate(val = .data[["MIX"]])
+  } else {
+    stop("`measure` not recognized. Use one of: '1-beta', '1-cor', 'mu050', 'bhq4', 'ahmp', 'mix'.")
+  }
+  
+  df |> select(country, cohort, val)
+}
+
+
+# Function to build balanced panel with relevant indicators
+make_panel = function(data, parent = "max", child = "all", measure = "1-beta"){
+  
+  df = data |> filter(.data$parent == !!parent, .data$child == !!child) |>
+    .add_indicator(measure)
+  
+  wide = df |>
+    pivot_wider(names_from = "cohort", values_from = "val") |>
+    arrange(country) |>
+    as.data.frame()
+  
+  wide
+}
+
+# Function to run Phillips-Sul tests
+run_ps = function(data,
+                  parent = "max",
+                  child = "all",
+                  measure = "1-beta",
+                  dataCols,
+                  time_trim = 0.3,
+                  HACmethod = "FQSB",
+                  cstar = 0,
+                  refCol = NULL) {
+  
+  panel_df = make_panel(data, parent, child, measure)
+  
+  if(is.null(refCol)) {
+    refCol = max(dataCols)
+  }
+  
+  H = computeH(panel_df[, dataCols], quantity = "H")
+  global = estimateMod(H, time_trim = time_trim, HACmethod = HACmethod)
+  
+  clubs = findClubs(panel_df, dataCols = dataCols, unit_names = 1, refCol = refCol,
+                    time_trim = time_trim, cstar = cstar, HACmethod = HACmethod)
+  
+  list(H = H, global = global, clubs = clubs)
+}
+
+# Restrict sample to countries with observations for 1940-1980 cohorts
+keep_1940 = gdim |> group_by(country) |> count() |> filter(n == 60) |> pull(country)
+gdim_1940 = gdim |> filter(country %in% keep_1940)
+
+mobility1 = gdim_1940 |> filter(code %in% group1)
+mobility2 = gdim_1940 |> filter(code %in% group2)
+mobility3 = gdim_1940 |> filter(code %in% group3)
+```
+
+The following code chunks apply the method to the mobility panel. I restrict the sample to maximum parental education and both sons and daughters. Each chunk is based around a different measure (based on Van der Weide et al. 2024):
+
+- 1-beta corresponds to 1 minus the coefficient from regressing children's schooling on parents' schooling. 
+
+- 1-cor corresponds to 1 minus the correlation between children's and parents' schooling.
+
+- MU050 corresponds to the expected educational rank of children born to parents from the bottom half.
+
+- BHQ4 corresponds to the probability that children born to parents in the bottom half reach the top quartile.
+
+- MIX corresponds to the share of children with strictly higher educational attainment than their parents (or with tertiary, conditional on one parent having attained tertiary).
+
+## IGE
+
+```{r}
+ige_1 = run_ps(mobility1, dataCols = 2:6); ige_1$clubs
+
+ige_2 = run_ps(mobility2, dataCols = 2:6); ige_2$clubs
+
+ige_3 = run_ps(mobility3, dataCols = 2:6); ige_3$clubs
+```
+
+## COR
+
+```{r}
+cor_1 = run_ps(mobility1, measure = "1-cor", dataCols = 2:6); cor_1$clubs
+
+cor_2 = run_ps(mobility2, measure = "1-cor", dataCols = 2:6); cor_2$clubs
+
+cor_3 = run_ps(mobility3, measure = "1-cor", dataCols = 2:6); cor_3$clubs
+```
+
+## MU050
+
+```{r}
+mu050_1 = run_ps(mobility1, measure = "mu050", dataCols = 2:6); mu050_1$clubs
+
+mu050_2 = run_ps(mobility2, measure = "mu050", dataCols = 2:6); mu050_2$clubs
+
+mu050_3 = run_ps(mobility3, measure = "mu050", dataCols = 2:6); mu050_3$clubs
+```
+
+## BHQ4
+
+```{r}
+bhq4_1 = run_ps(mobility1, measure = "bhq4", dataCols = 2:6); bhq4_1$clubs
+
+bhq4_2 = run_ps(mobility2, measure = "bhq4", dataCols = 2:6); bhq4_2$clubs
+
+bhq4_3 = run_ps(mobility3, measure = "bhq4", dataCols = 2:6); bhq4_3$clubs
+```
+
+## MIX
+
+```{r}
+mix_1 = run_ps(mobility1, measure = "mix", dataCols = 2:6); mix_1$clubs
+
+mix_2 = run_ps(mobility2, measure = "mix", dataCols = 2:6); mix_2$clubs
+
+mix_3 = run_ps(mobility3, measure = "mix", dataCols = 2:6); mix_3$clubs
+```
+
